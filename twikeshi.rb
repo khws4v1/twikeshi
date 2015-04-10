@@ -1,27 +1,43 @@
-#!/usr/bin/env ruby                                                                                                                                                                                                                          
-# coding: utf-8                                                                                                                                                                                                                              
-                                                                                                                                                                                                                                             
-require "optparse"                                                                                                                                                                                                                           
-require "twitter"                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                             
-sec                 = 0                                                                                                                                                                                                                      
-min                 = 0                                                                                                                                                                                                                      
-hour                = 0                                                                                                                                                                                                                      
-day                 = 0                                                                                                                                                                                                                      
-consumer_key        = ""                                                                                                                                                                                                                     
+#!/usr/bin/env ruby                                   
+# coding: utf-8
+
+require "optparse"
+require "twitter"
+
+sec                 = 0
+min                 = 0
+hour                = 0
+day                 = 0
+consumer_key        = ""
 consumer_secret     = ""                                                                                                                                                                                                                     
 access_token        = ""                                                                                                                                                                                                                     
 access_token_secret = ""                                                                                                                                                                                                                     
-                                                                                                                                                                                                                                             
+
 opt = OptionParser.new                                                                                                                                                                                                                       
-opt.on("-s value", "--second value", "秒数を指定します。")                                      {|v| sec = v.to_i if v.to_i >= 0}                                                                                                            
-opt.on("-m value", "--minute value", "分数を指定します。")                                      {|v| min = v.to_i if v.to_i >= 0}                                                                                                            
-opt.on("-h value", "--hour value", "時間数を指定します。")                                      {|v| hour = v.to_i if v.to_i >= 0}                                                                                                           
-opt.on("-d value", "--day value", "日数を指定します。")                                         {|v| day = v.to_i if v.to_i >= 0}                                                                                                            
-opt.on("--consumer-key key", "TwitterAPIのコンシュマーキーを指定します。")                      {|v| consumer_key = v}
-opt.on("--consumer-secret key", "TwitterAPIのコンシュマーキーシークレットを指定します。"  )     {|v| consumer_secret = v}
-opt.on("--access-token token", "TwitterAPIのアクセストークンを指定します。")                    {|v| access_token = v}
-opt.on("--access-token-secret token", "TwitterAPIのアクセストークンシークレットを指定します。") {|v| access_token_secret = v}
+opt.on("-s value", "--second value", "秒数を指定します。") {|v|
+    sec = v.to_i if v.to_i >= 0
+}
+opt.on("-m value", "--minute value", "分数を指定します。") {|v|
+  min = v.to_i if v.to_i >= 0
+}
+opt.on("-h value", "--hour value", "時間数を指定します。") {|v|
+  hour = v.to_i if v.to_i >= 0
+}
+opt.on("-d value", "--day value", "日数を指定します。") {|v|
+  day = v.to_i if v.to_i >= 0
+}
+opt.on("--consumer-key key", "TwitterAPIのコンシュマーキーを指定します。") {|v|
+  consumer_key = v
+}
+opt.on("--consumer-secret key", "TwitterAPIのコンシュマーキーシークレットを指定します。"  ) {|v|
+  consumer_secret = v
+}
+opt.on("--access-token token", "TwitterAPIのアクセストークンを指定します。") {|v|
+  access_token = v
+}
+opt.on("--access-token-secret token", "TwitterAPIのアクセストークンシークレットを指定します。") {|v|
+  access_token_secret = v
+}
 
 opt.parse!(ARGV)
 
