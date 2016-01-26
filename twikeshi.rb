@@ -1,88 +1,83 @@
-#!/usr/bin/env ruby                                   
+#!/usr/bin/env ruby
 # coding: utf-8
 
-require "optparse"
-require "twitter"
+require 'twitter'
+require 'yaml'
+require 'date'
+require 'logger'
 
-sec                 = 0
-min                 = 0
-hour                = 0
-day                 = 0
-consumer_key        = ""
-consumer_secret     = ""                                                                                                                                                                                                                     
-access_token        = ""                                                                                                                                                                                                                     
-access_token_secret = ""                                                                                                                                                                                                                     
+class Account
 
-opt = OptionParser.new                                                                                                                                                                                                                       
-opt.on("-s value", "--second value", "秒数を指定します。") {|v|
-    sec = v.to_i if v.to_i >= 0
-}
-opt.on("-m value", "--minute value", "分数を指定します。") {|v|
-  min = v.to_i if v.to_i >= 0
-}
-opt.on("-h value", "--hour value", "時間数を指定します。") {|v|
-  hour = v.to_i if v.to_i >= 0
-}
-opt.on("-d value", "--day value", "日数を指定します。") {|v|
-  day = v.to_i if v.to_i >= 0
-}
-opt.on("--consumer-key key", "TwitterAPIのコンシュマーキーを指定します。") {|v|
-  consumer_key = v
-}
-opt.on("--consumer-secret key", "TwitterAPIのコンシュマーキーシークレットを指定します。"  ) {|v|
-  consumer_secret = v
-}
-opt.on("--access-token token", "TwitterAPIのアクセストークンを指定します。") {|v|
-  access_token = v
-}
-opt.on("--access-token-secret token", "TwitterAPIのアクセストークンシークレットを指定します。") {|v|
-  access_token_secret = v
-}
+  def initialize(hash)
+    @client = Twitter::REST::Client.new do |config|
+      config.consumer_key        = hash['consumer_key']
+      config.consumer_secret     = hash['consumer_secret']
+      config.access_token        = hash['access_token']
+      config.access_token_secret = hash['access_token_secret']
+    end
+    @year = hash['year'] if hash.key?('year')
+    @mon  = hash['mon']  if hash.key?('mon')
+    @day  = hash['day']  if hash.key?('day')
+    @hour = hash['hour'] if hash.key?('hour')
+    @min  = hash['min']  if hash.key?('min')
+    @sec  = hash['sec']  if hash.key?('sec')
+  end
 
-opt.parse!(ARGV)
+  def client
+    @client
+  end
 
-if consumer_key.empty? || consumer_secret.empty? || access_token.empty? || access_token_secret.empty? then
-  STDERR.puts "引数が正しくありません。"
-  exit -1
+  # いつ以降ツイートを残すかを返す
+  def remain
+    dt = DateTime.now
+    dt = dt << @year * 12                  if @year != nil
+    dt = dt << @mon                        if @mon  != nil
+    dt = dt - @day                         if @day  != nil
+    dt = dt - Rational(@hour, 24)          if @hour != nil
+    dt = dt - Rational(@min, 24 * 60)      if @min  != nil
+    dt = dt - Rational(@sec, 24 * 60 * 60) if @sec  != nil
+    dt.to_time
+  end
 end
 
-rest_client = Twitter::REST::Client.new {|config|
-  config.consumer_key        = consumer_key
-  config.consumer_secret     = consumer_secret
-  config.access_token        = access_token
-  config.access_token_secret = access_token_secret
-}
-target_time = Time.now - sec - min*60 - hour*3600 - day*86400
-max_id = 0
-twikeshi_count = 0
+# 設定ファイル名
+CONFIG = 'twikeshi-conf.yaml'
+# 設定ファイルのオブジェクト
+yaml   = YAML.load_file(CONFIG)
+# アカウント
+accounts = Array.new
+# ログ
+log = Logger.new(yaml['logfile'] == nil ? STDERR : yaml['logfile'])
+
+yaml['accounts'].each do |account|
+  accounts << Account.new(account)
+end
 
 begin
-  target_user = rest_client.verify_credentials
-  loop {
-    statuses = {}
-    if max_id == 0 then
-      statuses = rest_client.user_timeline(target_user, :count => 200)
-    else
-      statuses = rest_client.user_timeline(target_user, :max_id => max_id, :count => 200)
-    end
-    statuses.each{|status|
-      if status.created_at < target_time then
-        rest_client.destroy_status(status)
-        puts "ツイートを削除しました。 ID: #{status.id} Text: #{status.text}"
-        twikeshi_count = twikeshi_count + 1
+  accounts.each do |account|
+    # 認証したTwitterアカウントのユーザオブジェクトを取得
+    user = account.client.verify_credentials
+    max_id = 0
+    
+    loop do
+      tweets = Array.new
+      if max_id == 0 then
+        tweets = account.client.user_timeline(user, :count => 200)
+      else
+        tweets = account.client.user_timeline(user, :count => 200, :max_id => max_id)
       end
-      max_id = status.id - 1 if max_id == 0 || max_id > status.id
-    }
-    break if statuses.empty?
-  }
+      tweets.each do |tweet|
+        if tweet.created_at < account.remain then
+          account.client.destroy_status(tweet)
+          log.info("#{user.id} @#{user.screen_name}: Status #{tweet.id} is destroyed.")
+        end
+        max_id = tweet.id - 1 if max_id == 0 || max_id > tweet.id
+      end
+      break if tweets.empty?
+    end
+  end
 rescue Twitter::Error::TooManyRequests => error
-  STDERR.puts "API制限に達したので#{error.rate_limit.reset_in + 1}秒待機します。"
+  log.warn(error.to_s)  
   sleep error.rate_limit.reset_in + 1
   retry
-rescue Twitter::Error::ClientError => error
-  STDERR.puts "エラーが発生しました。: #{error.to_s}"
-  sleep 10
 end
-
-puts "ツイ消しが完了しました。"
-puts "消したツイートの数: #{twikeshi_count.to_s}"
